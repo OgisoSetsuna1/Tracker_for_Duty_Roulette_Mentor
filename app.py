@@ -24,7 +24,6 @@ INSTANCE_DIR = BASE_DIR / 'instance'
 if not INSTANCE_DIR.exists():
     INSTANCE_DIR.mkdir(parents=True)
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'ff14-dungeon-logger-local'
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{INSTANCE_DIR / "database.db"}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
