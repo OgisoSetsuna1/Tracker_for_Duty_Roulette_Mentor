@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh">
+
+<head>
+    <meta charset="utf-8">
+    <title>数据统计</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        .navbar-nav .nav-link {
+            color: #ccc;
+            transition: color 0.2s ease;
+        }
+
+        .navbar-nav .nav-link:hover {
+            color: #fff;
+        }
+
+        .navbar-nav .nav-link.active {
+            color: #eddfaa;
+            font-weight: bold;
+        }
+
+        .navbar-glass {
+            background: url("/static/images/navbar.png") center center / cover no-repeat;
+            position: relative;
+            z-index: 1;
+        }
+
+        .navbar-glass::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            backdrop-filter: blur(5px);
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+        }
+
+        .chart-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 1.5rem;
+            padding: 1rem;
+        }
+
+        .chart-card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow:
+                4px 4px 8px rgba(0, 0, 0, 0.6),
+                -4px -4px 8px rgba(255, 255, 255, 0.05),
+                inset 1px 1px 2px rgba(0, 0, 0, 0.4),
+                inset -1px -1px 2px rgba(255, 255, 255, 0.03);
+            padding: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .icon-button {
+            height: 40px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .icon-button:hover {
+            transform: scale(1.1);
+        }
+
+        .icon-button.selected {
+            outline: 2px solid #999;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body class="container-fluid">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-glass mb-4 shadow">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold fs-4" href="/">Final Fantasy XIV 导随记录器 本地版</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 fs-5">
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'index' %}active{% endif %}" href="/">回到首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'record' %}active{% endif %}" href="/record">导随记录</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'stats' %}active{% endif %}" href="/stats">数据统计</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'settings' %}active{% endif %}"
+                            href="/settings">用户设置</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    {% if has_records %}
+    <div class="chart-container">
+        <div class="chart-card">
+            <div id="attrChart" style="width: 100%; height: 400px;"></div>
+        </div>
+
+        <div class="chart-card">
+            <div id="jobChart" style="width: 100%; height: 400px;"></div>
+        </div>
+
+        <div class="chart-card">
+            <div id="serverChart" style="width: 100%; height: 400px;"></div>
+        </div>
+
+        <div class="chart-card">
+            <div id="dungeonTypeChart" style="width: 100%; height: 400px;"></div>
+        </div>
+
+        <div class="chart-card">
+            <div id="specialChartSwitch" class="d-flex flex-column gap-2">
+                <img src="/static/icons/所有.png" alt="所有" class="icon-button" onclick="renderSpecialChart('所有')">
+                <img src="/static/icons/防护职业.png" alt="防护职业" class="icon-button" onclick="renderSpecialChart('防护职业')">
+                <img src="/static/icons/治疗职业.png" alt="治疗职业" class="icon-button" onclick="renderSpecialChart('治疗职业')">
+                <img src="/static/icons/输出职业.png" alt="输出职业" class="icon-button" onclick="renderSpecialChart('输出职业')">
+            </div>
+            <div id="specialChart" style="width: 100%; height: 400px;"></div>
+        </div>
+
+        <div class="chart-card">
+            <div id="timeChartSwitch" class="d-flex flex-column gap-2">
+                <img src="/static/icons/周.png" alt="周" class="icon-button" onclick="renderTimeChart('周')">
+                <img src="/static/icons/月.png" alt="月" class="icon-button" onclick="renderTimeChart('月')">
+            </div>
+            <div id="timeChart" style="flex-grow: 1; height: 400px;"></div>
+        </div>
+
+        <div class="chart-card">
+            <div id="hourChart" style="width: 100%; height: 400px;"></div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center mt-5">
+        <h3 class="text-muted">尚无记录，请前往导随记录页面添加记录。</h3>
+    </div>
+    {% endif %}
+
+
+    <script>
+        const attrData = JSON.parse('{{ attr_data | tojson | safe }}');
+        const jobData = JSON.parse('{{ job_data | tojson | safe }}');
+        const serverData = JSON.parse('{{ server_data | tojson | safe }}');
+        const dungeonTypeData = JSON.parse('{{ dungeon_type_data | tojson | safe }}');
+        const specialData = JSON.parse('{{ special_dungeon_ratio | tojson | safe }}');
+        const weekData = JSON.parse('{{ week_data | tojson | safe }}');
+        const monthData = JSON.parse('{{ month_data | tojson | safe }}');
+        const hoursData = JSON.parse('{{ hours_data | tojson | safe }}');
+
+        // 职能分布
+        const attrOrder = ['防护职业', '治疗职业', '输出职业'];
+        const attrChart = echarts.init(document.getElementById('attrChart'));
+        const attrSeries = attrOrder.map(name => ({
+            name: name,
+            value: attrData[name]
+        }));
+        const attrLegend = attrOrder.map(name => ({
+            name: name,
+            icon: `image:///static/icons/${name}.png`
+        }));
+        attrChart.setOption({
+            textStyle: { fontSize: 16 },
+            title: { text: '职能分布', left: 'center' },
+            tooltip: { trigger: 'item' },
+            color: ["#48589f", "#45693d", "#754846"],
+            legend: {
+                itemWidth: 24,
+                itemHeight: 24,
+                orient: 'vertical',
+                right: 10,
+                top: 'center',
+                data: attrLegend
+            },
+            series: [{
+                type: 'pie',
+                radius: '60%',
+                center: ['40%', '50%'],
+                data: attrSeries,
+                emphasis: {
+                    itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' }
+                }
+            }]
+        })
+
+        attrChart.on('click', function (params) {
+            const query = encodeURIComponent('职能:' + params.name);
+            window.location.href = '/record?q=' + query;
+        });
+
+        // 职业分布
+        const jobChart = echarts.init(document.getElementById('jobChart'));
+        const jobSeries = Object.entries(jobData)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+        const jobLegend = jobSeries.map(item => ({
+            name: item.name,
+            icon: `image:///static/icons/${item.name}.png`
+        }));
+        jobChart.setOption({
+            textStyle: { fontSize: 16 },
+            title: { text: '职业分布', left: 'center' },
+            tooltip: { trigger: 'item' },
+            legend: {
+                itemWidth: 24,
+                itemHeight: 24,
+                orient: 'vertical',
+                right: 10,
+                top: 'center',
+                data: jobLegend
+            },
+            series: [{
+                type: 'pie',
+                radius: '60%',
+                center: ['40%', '50%'],
+                data: jobSeries,
+                emphasis: {
+                    itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' }
+                }
+            }]
+        });
+
+        jobChart.on('click', function (params) {
+            const query = encodeURIComponent('职业:' + params.name);
+            window.location.href = '/record?q=' + query;
+        });
+
+        // 大区分布
+        const serverChart = echarts.init(document.getElementById('serverChart'));
+        const serverSeries = Object.entries(serverData)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+        const serverLegend = serverSeries.map(item => ({
+            name: item.name,
+            icon: `image:///static/icons/${item.name}.png`
+        }));
+        serverChart.setOption({
+            textStyle: { fontSize: 16 },
+            title: { text: '大区分布', left: 'center' },
+            tooltip: { trigger: 'item' },
+            legend: {
+                itemWidth: 24,
+                itemHeight: 24,
+                orient: 'vertical',
+                right: 10,
+                top: 'center',
+                data: serverLegend
+            },
+            series: [{
+                type: 'pie',
+                radius: '60%',
+                center: ['40%', '50%'],
+                data: serverSeries,
+                emphasis: {
+                    itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' }
+                }
+            }]
+        });
+
+        serverChart.on('click', function (params) {
+            const query = encodeURIComponent('大区:' + params.name);
+            window.location.href = '/record?q=' + query;
+        });
+
+        // 副本类型分布
+        const dungeonTypeMap = {
+            '0': '迷宫挑战',
+            '1': '行会令',
+            '2': '讨伐歼灭战',
+            '3': '大型任务'
+        };
+        const dungeonTypeChart = echarts.init(document.getElementById('dungeonTypeChart'));
+        const dungeonSeries = Object.entries(dungeonTypeData)
+            .map(([code, value]) => ({
+                name: dungeonTypeMap[code],
+                raw: code,
+                value: value
+            }))
+            .sort((a, b) => b.value - a.value);
+
+        const dungeonLegend = dungeonSeries.map(item => ({
+            name: item.name,
+            icon: `image:///static/icons/${item.raw}.png`
+        }));
+        dungeonTypeChart.setOption({
+            textStyle: { fontSize: 16 },
+            title: { text: '副本类型分布', left: 'center' },
+            tooltip: { trigger: 'item' },
+            legend: {
+                itemWidth: 24,
+                itemHeight: 24,
+                orient: 'vertical',
+                right: 10,
+                top: 'center',
+                data: dungeonLegend
+            },
+            series: [{
+                type: 'pie',
+                radius: '60%',
+                center: ['40%', '50%'],
+                data: dungeonSeries,
+                emphasis: {
+                    itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' }
+                }
+            }]
+        });
+
+        dungeonTypeChart.on('click', function (params) {
+            const query = encodeURIComponent('副本类型:' + params.name);
+            window.location.href = '/record?q=' + query;
+        });
+
+        // 主随占比
+        const specialChart = echarts.init(document.getElementById('specialChart'));
+
+        function renderSpecialChart(attr) {
+            const switcher = document.getElementById('specialChartSwitch');
+            switcher.querySelectorAll('.icon-button').forEach(img => img.classList.remove('selected'));
+            switcher.querySelector(`img[alt="${attr}"]`).classList.add('selected');
+
+            const raw = specialData[attr];
+            const option = {
+                textStyle: { fontSize: 16 },
+                title: {
+                    text: `主随占比 - ${attr}`,
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'item'
+                },
+                legend: {
+                    itemWidth: 24,
+                    itemHeight: 24,
+                    orient: 'vertical',
+                    right: 10,
+                    top: 'center'
+                },
+                series: [{
+                    type: 'pie',
+                    radius: '65%',
+                    center: ['40%', '50%'],
+                    data: Object.entries(raw).map(([name, value]) => ({ name, value })),
+                    emphasis: {
+                        itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0,0,0,0.5)' }
+                    }
+                }]
+            };
+            specialChart.setOption(option);
+
+            specialChart.off('click'); // 防止多次绑定
+
+            specialChart.on('click', function (params) {
+                const dungeon = params.name;
+                const queryAttr = attr !== '所有' ? ` 职能:${attr}` : '';
+                const query = encodeURIComponent(`副本名:${dungeon}${queryAttr}`);
+                window.location.href = '/record?q=' + query;
+            });
+        }
+
+        // 默认加载“所有”
+        renderSpecialChart('所有');
+
+        // 最近导随次数
+        const timeChart = echarts.init(document.getElementById('timeChart'));
+
+        function renderTimeChart(attr) {
+            const data = attr === '周' ? weekData : monthData;
+
+            const switcher = document.getElementById('timeChartSwitch');
+            switcher.querySelectorAll('.icon-button').forEach(img => img.classList.remove('selected'));
+            switcher.querySelector(`img[alt="${attr}"]`).classList.add('selected');
+
+            const labels = Object.keys(data);
+            const values = Object.values(data);
+            timeChart.setOption({
+                title: {
+                    text: '最近一' + attr + '导随次数',
+                    left: 'center'
+                },
+                tooltip: {},
+                xAxis: {
+                    type: 'category',
+                    data: labels,
+                    axisLabel: {
+                        rotate: 45,
+                        fontSize: 10,
+                        interval: 0
+                    }
+                },
+                yAxis: { type: 'value' },
+                series: [{
+                    type: 'line',
+                    data: values
+                }]
+            });
+
+            timeChart.off('click');
+            timeChart.on('click', function (params) {
+                const query = encodeURIComponent('时间:' + params.name);
+                window.location.href = '/record?q=' + query;
+            });
+        }
+
+        // 默认加载最近一周
+        renderTimeChart('周');
+
+
+
+        // 小时分布
+        const hourChart = echarts.init(document.getElementById('hourChart'));
+        const hourLabels = Object.keys(hoursData);
+        const hourValues = Object.values(hoursData);
+        hourChart.setOption({
+            textStyle: { fontSize: 16 },
+            title: { text: '小时分布', left: 'center' },
+            tooltip: {},
+            xAxis: {
+                type: 'category',
+                data: hourLabels,
+                axisLabel: {
+                    interval: 0
+                }
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: [{
+                data: hourValues,
+                type: 'bar'
+            }]
+        });
+
+        hourChart.on('click', function (params) {
+            const query = encodeURIComponent('时间:' + params.name);
+            window.location.href = '/record?q=' + query;
+        });
+
+        // 加载和页面缩放时重新缩放所有 Chart
+        function resizeAllCharts() {
+            attrChart.resize();
+            jobChart.resize();
+            serverChart.resize();
+            dungeonTypeChart.resize();
+            specialChart.resize();
+            timeChart.resize();
+            hourChart.resize();
+        }
+
+        window.addEventListener('load', resizeAllCharts);
+        window.addEventListener('resize', resizeAllCharts);
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>

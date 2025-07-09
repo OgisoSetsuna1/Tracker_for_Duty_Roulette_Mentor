@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh">
+
+<head>
+    <meta charset="utf-8">
+    <title>用户设置</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-size: 0.9rem;
+        }
+
+        .navbar-nav .nav-link {
+            color: #ccc;
+            transition: color 0.2s ease;
+        }
+
+        .navbar-nav .nav-link:hover {
+            color: #fff;
+        }
+
+        .navbar-nav .nav-link.active {
+            color: #eddfaa;
+            font-weight: bold;
+        }
+
+        .navbar-glass {
+            background: url("/static/images/navbar.png") center center / cover no-repeat;
+            position: relative;
+            z-index: 1;
+        }
+
+        .navbar-glass::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            backdrop-filter: blur(5px);
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body class="container-fluid">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-glass mb-4 shadow">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold fs-4" href="/">Final Fantasy XIV 导随记录器 本地版</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 fs-5">
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'index' %}active{% endif %}" href="/">回到首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'record' %}active{% endif %}" href="/record">导随记录</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'stats' %}active{% endif %}" href="/stats">数据统计</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'settings' %}active{% endif %}"
+                            href="/settings">用户设置</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="px-5">
+        <h1 class="mb-4">用户设置</h1>
+        {% if success %}
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            设置已成功保存！
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/settings" novalidate>
+            <div class="mb-3">
+                <label for="username" class="form-label">用户名</label>
+                <input type="text" class="form-control {% if error and 'username' in error %}is-invalid{% endif %}"
+                    id="username" name="username" value="{{ settings.get('username', '') }}" required>
+                {% if error and 'username' in error %}
+                <div class="invalid-feedback">
+                    {{ error['username'] }}
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="mb-3">
+                <label for="target_count" class="form-label">期望导随次数</label>
+                <input type="number"
+                    class="form-control {% if error and 'target_count' in error %}is-invalid{% endif %}"
+                    id="target_count" name="target_count" min="1" value="{{ settings.get('target_count', '') }}"
+                    required>
+                {% if error and 'target_count' in error %}
+                <div class="invalid-feedback">
+                    {{ error['target_count'] }}
+                </div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn btn-primary">保存设置</button>
+        </form>
+
+        <div class="d-grid gap-3 col-6 mx-auto">
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>

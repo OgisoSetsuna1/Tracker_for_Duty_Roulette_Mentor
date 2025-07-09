@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh">
+
+<head>
+    <meta charset="utf-8">
+    <title>Final Fantasy XIV 导随记录器 本地版</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: 'FantasyNumberFont';
+            src: url('/static/fonts/Jupiter-Pro-Bold_25612.ttf') format('truetype');
+            font-display: swap;
+        }
+
+        body {
+            font-size: 0.9rem;
+        }
+
+        .navbar-nav .nav-link {
+            color: #ccc;
+            transition: color 0.2s ease;
+        }
+
+        .navbar-nav .nav-link:hover {
+            color: #fff;
+        }
+
+        .navbar-nav .nav-link.active {
+            color: #eddfaa;
+            font-weight: bold;
+        }
+
+        .navbar-glass {
+            background: url("/static/images/navbar.png") center center / cover no-repeat;
+            position: relative;
+            z-index: 1;
+        }
+
+        .navbar-glass::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            backdrop-filter: blur(5px);
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body class="container-fluid">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-glass mb-4 shadow">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold fs-4" href="/">Final Fantasy XIV 导随记录器 本地版</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 fs-5">
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'index' %}active{% endif %}" href="/">回到首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'record' %}active{% endif %}" href="/record">导随记录</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'stats' %}active{% endif %}" href="/stats">数据统计</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'settings' %}active{% endif %}"
+                            href="/settings">用户设置</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+        <div class="text-center mb-4">
+            <h1 class="fw-bold">欢迎，{{ username }}！</h1>
+        </div>
+
+        <div class="d-flex justify-content-center">
+            <div class="position-relative" style="width: 220px; height: 220px;">
+                <svg width="220" height="220">
+                    <defs>
+                        <linearGradient id="gradient" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#ffd54f" />
+                            <stop offset="50%" stop-color="#ffb300" />
+                            <stop offset="100%" stop-color="#ff6f00" />
+                        </linearGradient>
+                        <radialGradient id="softGlow" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="rgba(255,255,255,0.05)" />
+                            <stop offset="100%" stop-color="rgba(0,0,0,0.1)" />
+                        </radialGradient>
+                        <filter id="glow">
+                            <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
+                            <feMerge>
+                                <feMergeNode in="coloredBlur" />
+                                <feMergeNode in="SourceGraphic" />
+                            </feMerge>
+                        </filter>
+                    </defs>
+
+                    <!-- 背景圈 -->
+                    <circle cx="110" cy="110" r="90" stroke="url(#softGlow)" stroke-width="20" fill="none" />
+
+                    <!-- 动态进度圆 -->
+                    <circle id="progressCircle" cx="110" cy="110" r="90" stroke="url(#gradient)" stroke-width="20"
+                        fill="none" stroke-linecap="round" filter="url(#glow)" stroke-dasharray="565.5"
+                        stroke-dashoffset="565.5" transform="rotate(-90 110 110)"
+                        style="transition: stroke-dashoffset 2s cubic-bezier(0.65, 0, 0.35, 1);" />
+                </svg>
+
+                <!-- 百分比文字 -->
+                <div class="position-absolute top-50 start-50 translate-middle text-center">
+                    <div id="percentText" style="font-size: 1.8rem; font-family: FantasyNumberFont;">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4" style="font-family: 'FantasyNumberFont';">
+            <p class="fs-2">
+                导随次数：<strong>{{ total_records }} / {{ target_count }}</strong>
+            </p>
+            {% if total_records < target_count %} <p class="fs-2" style="color: #f1d056;">
+                你距离天阳马还剩 <strong>{{ target_count - total_records }}</strong> 次导随，加油！
+                </p>
+                {% else %}
+                <p class="fs-2 text-success">
+                    你已成功获得天阳马，恭喜！
+                </p>
+                {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const percent = parseFloat("{{ percent }}");  // 字符串转数字（含小数）
+            const circle = document.getElementById('progressCircle');
+            const text = document.getElementById('percentText');
+
+            const targetOffset = 565.5 - (percent / 100) * 565.5;
+            setTimeout(() => {
+                circle.style.strokeDashoffset = targetOffset;
+            }, 100);
+
+            const duration = 2000;
+            const start = performance.now();
+
+            function easeInOut(t) {
+                return t < 0.5
+                    ? 4 * t * t * t
+                    : 1 - Math.pow(-2 * t + 2, 3) / 2;
+            }
+
+            function animate(time) {
+                const elapsed = time - start;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = easeInOut(progress);
+                const value = (eased * percent).toFixed(1);  // 保留一位小数
+                text.textContent = value + '%';
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        });
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="zh">
+
+<head>
+    <meta charset="utf-8">
+    <title>导随记录</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        body {
+            font-size: 0.9rem;
+        }
+
+        .navbar-nav .nav-link {
+            color: #ccc;
+            transition: color 0.2s ease;
+        }
+
+        .navbar-nav .nav-link:hover {
+            color: #fff;
+        }
+
+        .navbar-nav .nav-link.active {
+            color: #eddfaa;
+            font-weight: bold;
+        }
+
+        .navbar-glass {
+            background: url("/static/images/navbar.png") center center / cover no-repeat;
+            position: relative;
+            z-index: 1;
+        }
+
+        .navbar-glass::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            backdrop-filter: blur(5px);
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+        }
+
+        .select2-container.select2-container--open {
+            font-size: 0.9rem !important;
+            z-index: 9999 !important;
+        }
+
+        .select2-container .select2-selection--single {
+            height: 40px !important;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: normal !important;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 100%;
+            top: 0;
+            right: 6px;
+        }
+
+        .card-body span,
+        .card-body div {
+            font-size: 0.9rem;
+        }
+
+        .card.embossed {
+            border-radius: 1rem;
+            color: white;
+            box-shadow:
+                4px 4px 8px rgba(0, 0, 0, 0.6),
+                /* 右下阴影 */
+                -4px -4px 8px rgba(255, 255, 255, 0.05),
+                /* 左上高光 */
+                inset 1px 1px 2px rgba(0, 0, 0, 0.4),
+                /* 内阴影 */
+                inset -1px -1px 2px rgba(255, 255, 255, 0.03);
+            /* 内高光 */
+            transition: box-shadow 0.3s ease;
+        }
+    </style>
+</head>
+
+<body class="container-fluid">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-glass mb-4 shadow">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold fs-4" href="/">Final Fantasy XIV 导随记录器 本地版</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 fs-5">
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'index' %}active{% endif %}" href="/">回到首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'record' %}active{% endif %}" href="/record">导随记录</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'stats' %}active{% endif %}" href="/stats">数据统计</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if active_page == 'settings' %}active{% endif %}"
+                            href="/settings">用户设置</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="px-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addModal">
+                    添加记录
+                </button>
+                <!-- 添加记录模态框 -->
+                <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <form method="POST" action="/add">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="addModalLabel">添加记录</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label">职业</label>
+                                        <select name="job" id="jobSelect" class="form-select select2-with-icons fs-5"
+                                            required>
+                                            <option value="">请选择职业</option>
+                                            {% for j in jobs %}
+                                            <option value="{{ j }}"
+                                                data-icon="{{ url_for('static', filename='icons/' + j + '.png') }}">{{ j
+                                                }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">大区</label>
+                                        <select name="server" id="serverSelect"
+                                            class="form-select select2-with-icons fs-5" required>
+                                            <option value="">请选择大区</option>
+                                            {% for s in servers %}
+                                            <option value="{{ s }}"
+                                                data-icon="{{ url_for('static', filename='icons/' + s + '.png') }}">{{ s
+                                                }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">副本</label>
+                                        <select name="dungeon" class="form-select select2-with-icons fs-5" required>
+                                            <option value="">请选择副本</option>
+                                            {% for d_name, d_level, d_type in dungeons %}
+                                            <option value="{{ d_name }}"
+                                                data-icon="{{ url_for('static', filename='icons/' + d_type + '.png') }}">
+                                                {{
+                                                'Lv.' + d_level + ' ' + d_name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">时间（不填写则默认为当前时间）</label>
+                                        <input type="datetime-local" name="time" class="form-control">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">备注</label>
+                                        <textarea name="note" class="form-control" rows="3"
+                                            placeholder="请输入备注内容..."></textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                    <button type="submit" class="btn btn-primary">保存</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-danger me-2" data-bs-toggle="modal" data-bs-target="#importModal">
+                    导入记录
+                </button>
+                <!-- 导入记录模态框 -->
+                <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel"
+                    aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <form method="POST" action="/import_excel" enctype="multipart/form-data">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="importModalLabel">导入记录</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body row g-3">
+                                    <div class="col-9">
+                                        <label class="form-label">选择文件</label>
+                                        <input type="file" name="file" accept=".xlsx" class="form-control" required>
+                                    </div>
+                                    <div class="col-3">
+                                        <label class="form-label">默认大区</label>
+                                        <select name="default_server" class="form-select select2-with-icons fs-5"
+                                            required>
+                                            {% for s in servers %}
+                                            <option value="{{ s }}"
+                                                data-icon="{{ url_for('static', filename='icons/' + s + '.png') }}">
+                                                {{ s }}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-12 text-muted small">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        注意：
+                                        <ul class="mb-0">
+                                            <li>导入文件需为 xlsx 格式；</li>
+                                            <li>文件第一行为表头，必须包含「副本」、「职业」、「时间」列，可以包含「大区」（若无该列则所有记录均会被记为默认大区）、「备注」（若无该列则所有记录的备注均为空），其它列将被忽略；
+                                            </li>
+                                            <li>时间列的格式可为 「年月日时分秒」或者「年月日」，如 2025-07-08 11:45:14 或者
+                                                2025-07-08。无时分秒的记录将被记为当天的 00:00:00。</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                    <button type="submit" class="btn btn-primary">开始导入</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <a href="/export_excel" class="btn btn-success">导出记录</a>
+
+            </div>
+
+            <!-- 搜索框 -->
+            <form method="get" class="d-flex" style="min-width: 300px;">
+                <input type="text" name="q" value="{{ request.args.get('q', '') }}"
+                    class="form-control form-control-sm me-2" placeholder="搜索职业、大区、副本、备注……" />
+                <button type="submit" class="btn btn-sm btn-outline-primary"
+                    style="white-space: nowrap; height: calc(1.5em + .5rem + 2px);">搜索</button>
+            </form>
+        </div>
+
+        <hr class="my-3">
+
+        <div class="row g-3">
+            {% for r in records %}
+            <div class="col-12">
+                <div class="card embossed" style="border-radius: 12px;" data-bg-color="{{ job_colors[r.job] }}">
+                    <div class="card-body d-flex align-items-center text-white py-2" style="gap: 8px;">
+                        <div style="width: 80px; text-align: center; color: white;">
+                            <img src="{{ url_for('static', filename='icons/' + r.job + '_.png') }}" width="64"
+                                height="64" class="mb-1">
+                        </div>
+                        <div style="width: 80px; text-align: center; color: white;">
+                            {{ r.time.strftime('%Y-%m-%d %H:%M') }}
+                        </div>
+                        <div style="width: 80px; text-align: center;">
+                            <img src="{{ url_for('static', filename='icons/' + r.server + '.png') }}" width="64"
+                                height="64" class="mb-1">
+                        </div>
+                        <div style="width: 320px; display: flex; align-items: center; gap: 8px;">
+                            <img src="{{ url_for('static', filename='icons/' + r.dungeon_type + '.png') }}" width="28"
+                                height="28">
+                            <span style="color: white;">{{ 'Lv.' + r.dungeon_level + ' ' + r.dungeon }}</span>
+                        </div>
+                        <div style="flex: 1; text-align: left; display: flex; align-items: center; color: white;">
+                            {{ r.note }}
+                        </div>
+                        <div style="width: 120px; text-align: center;">
+                            <button type="button" class="btn btn-sm btn-secondary me-2" data-bs-toggle="modal"
+                                data-bs-target="#editModal{{ r.id }}">编辑</button>
+                            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal"
+                                data-bs-target="#deleteModal{{ r.id }}">删除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 编辑模态框 -->
+            <div class="modal fade" id="editModal{{ r.id }}" tabindex="-1" aria-labelledby="editModalLabel{{ r.id }}"
+                aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <form method="POST" action="/update/{{ r.id }}">
+                            <div class="modal-header">
+                                <h5 class="modal-title">编辑记录</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="关闭"></button>
+                            </div>
+                            <div class="modal-body row g-3">
+                                <!-- 职业 -->
+                                <div class="col-md-3">
+                                    <label class="form-label">职业</label>
+                                    <select name="job" class="form-select select2-with-icons" required>
+                                        {% for j in jobs %}
+                                        <option value="{{ j }}"
+                                            data-icon="{{ url_for('static', filename='icons/' + j + '.png') }}" {% if
+                                            j==r.job %}selected{% endif %}>{{ j }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <!-- 大区 -->
+                                <div class="col-md-3">
+                                    <label class="form-label">大区</label>
+                                    <select name="server" class="form-select select2-with-icons" required>
+                                        {% for s in servers %}
+                                        <option value="{{ s }}"
+                                            data-icon="{{ url_for('static', filename='icons/' + s + '.png') }}" {% if
+                                            s==r.server %}selected{% endif %}>{{ s }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <!-- 副本 -->
+                                <div class="col-md-6">
+                                    <label class="form-label">副本</label>
+                                    <select name="dungeon" class="form-select select2-with-icons" required>
+                                        {% for d_name, d_level, d_type in dungeons %}
+                                        <option value="{{ d_name }}"
+                                            data-icon="{{ url_for('static', filename='icons/' + d_type + '.png') }}" {%
+                                            if d_name==r.dungeon %}selected{% endif %}>
+                                            {{ 'Lv.' + d_level + ' ' + d_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <!-- 时间 -->
+                                <div class="col-md-6">
+                                    <label class="form-label">时间</label>
+                                    <input type="datetime-local" name="time" class="form-control"
+                                        value="{{ r.time.strftime('%Y-%m-%dT%H:%M') }}">
+                                </div>
+                                <!-- 备注 -->
+                                <div class="col-12">
+                                    <label class="form-label">备注</label>
+                                    <textarea name="note" class="form-control" rows="3">{{ r.note }}</textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-primary">保存修改</button>
+                            </div>
+                            <input type="hidden" name="page" value="{{ records.page }}">
+                            <input type="hidden" name="per_page" value="{{ records.per_page }}">
+                            <input type="hidden" name="order" value="{{ request.args.get('order', 'desc') }}">
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="modal fade" id="deleteModal{{ r.id }}" tabindex="-1"
+                aria-labelledby="deleteModalLabel{{ r.id }}" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="POST" action="/delete">
+                            <input type="hidden" name="record_ids" value="{{ r.id }}">
+                            <div class="modal-header">
+                                <h5 class="modal-title">确认删除</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="关闭"></button>
+                            </div>
+                            <div class="modal-body">
+                                确定要删除使用 <strong>{{ r.job }}</strong> 于 <strong>{{ r.time.strftime('%Y-%m-%d %H:%M')
+                                    }}</strong> 在 <strong>{{ r.server }}</strong> 区通关 <strong>{{ r.dungeon }}</strong>
+                                的记录吗？
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                                <button type="submit" class="btn btn-danger">确认删除</button>
+                            </div>
+                            <input type="hidden" name="page" value="{{ records.page }}">
+                            <input type="hidden" name="per_page" value="{{ records.per_page }}">
+                            <input type="hidden" name="order" value="{{ request.args.get('order', 'desc') }}">
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 分页控件 -->
+        <div class="d-flex justify-content-between align-items-center mt-4 mb-2 flex-wrap">
+            <form method="get" class="d-flex align-items-center mb-2">
+                <label class="me-2">每页显示：</label>
+                <select name="per_page" class="form-select form-select-sm w-auto me-2" onchange="this.form.submit()">
+                    <option value="5" {% if records.per_page==5 %}selected{% endif %}>5</option>
+                    <option value="10" {% if records.per_page==10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if records.per_page==20 %}selected{% endif %}>20</option>
+                </select>
+                <input type="hidden" name="page" value="1">
+                <input type="hidden" name="order" value="{{ request.args.get('order', 'desc') }}">
+            </form>
+
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <nav>
+                    <ul class="pagination mb-0">
+                        {% set current_page = records.page %}
+                        {% set total_pages = records.pages %}
+                        {% set page_window = 2 %}
+                        {% set page_start = (1 if current_page - page_window < 1 else current_page - page_window) %} {%
+                            set page_end=(total_pages if current_page + page_window> total_pages else current_page +
+                            page_window) %}
+
+                            {% if records.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                    href="?page={{ records.prev_num }}&per_page={{ records.per_page }}&order={{ request.args.get('order', 'desc') }}&q={{ request.args.get('q', '') }}">上一页</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled"><span class="page-link">上一页</span></li>
+                            {% endif %}
+
+                            {% if page_start > 1 %}
+                            <li class="page-item"><a class="page-link"
+                                    href="?page=1&per_page={{ records.per_page }}&order={{ request.args.get('order', 'desc') }}&q={{ request.args.get('q', '') }}">1</a>
+                            </li>
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                            {% endif %}
+
+                            {% for p in range(page_start, page_end + 1) %}
+                            <li class="page-item {% if p == current_page %}active{% endif %}">
+                                <a class="page-link"
+                                    href="?page={{ p }}&per_page={{ records.per_page }}&order={{ request.args.get('order', 'desc') }}&q={{ request.args.get('q', '') }}">{{
+                                    p }}</a>
+                            </li>
+                            {% endfor %}
+
+                            {% if page_end < total_pages %} <li class="page-item disabled"><span
+                                    class="page-link">…</span></li>
+                                <li class="page-item"><a class="page-link"
+                                        href="?page={{ total_pages }}&per_page={{ records.per_page }}&order={{ request.args.get('order', 'desc') }}&q={{ request.args.get('q', '') }}">{{
+                                        total_pages }}</a>
+                                </li>
+                                {% endif %}
+
+                                {% if records.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link"
+                                        href="?page={{ records.next_num }}&per_page={{ records.per_page }}&order={{ request.args.get('order', 'desc') }}&q={{ request.args.get('q', '') }}">下一页</a>
+                                </li>
+                                {% else %}
+                                <li class="page-item disabled"><span class="page-link">下一页</span></li>
+                                {% endif %}
+                    </ul>
+                </nav>
+
+                <!-- 跳转到页码 -->
+                <form class="d-flex align-items-center ms-3" method="get">
+                    <label class="me-2">跳转到：</label>
+                    <input type="number" name="page" min="1" max="{{ total_pages }}"
+                        class="form-control form-control-sm w-auto me-2" style="width: 80px;" required>
+                    <input type="hidden" name="per_page" value="{{ records.per_page }}">
+                    <input type="hidden" name="order" value="{{ request.args.get('order', 'desc') }}">
+                    <input type="hidden" name="q" value="{{ request.args.get('q', '') }}">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">跳转</button>
+                </form>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+        <script>
+            $(document).ready(function () {
+                $('.card[data-bg-color]').each(function () {
+                    const bgColor = $(this).data('bg-color');
+                    if (bgColor) {
+                        $(this).css('background-color', bgColor);
+                    }
+                });
+            });
+
+            function formatStandardOption(state) {
+                return state.text;
+            }
+
+            function formatJobOption(state) {
+                if (!state.id) return state.text;
+                const iconUrl = $(state.element).data('icon');
+                if (!iconUrl) return state.text;
+                return $('<span><img src="' + iconUrl + '" width="32" height="32" /> ' + state.text + '</span>');
+            }
+
+            $(document).ready(function () {
+                $('.select2').select2({ width: '100%', templateResult: formatStandardOption, templateSelection: formatStandardOption });
+                $('.select2-with-icons').select2({
+                    width: '100%',
+                    templateResult: formatJobOption,
+                    templateSelection: formatJobOption,
+                    escapeMarkup: function (m) { return m; }
+                });
+            });
+
+            $(document).on('shown.bs.modal', function () {
+                $('.select2-with-icons').each(function () {
+                    if ($(this).hasClass('select2-hidden-accessible')) {
+                        $(this).select2('destroy');
+                    }
+                    $(this).select2({
+                        width: '100%',
+                        dropdownParent: $(this).closest('.modal'),
+                        templateResult: formatJobOption,
+                        templateSelection: formatJobOption,
+                        escapeMarkup: function (m) { return m; }
+                    });
+                });
+            });
+
+            // 自动填入上次的职业和大区
+            document.addEventListener('DOMContentLoaded', function () {
+                const jobSelect = document.getElementById('jobSelect');
+                const serverSelect = document.getElementById('serverSelect');
+
+                const lastJob = localStorage.getItem('last_job');
+                const lastServer = localStorage.getItem('last_server');
+
+                if (lastJob) jobSelect.value = lastJob;
+                if (lastServer) serverSelect.value = lastServer;
+
+                if ($(jobSelect).hasClass('select2-hidden-accessible')) {
+                    $(jobSelect).trigger('change');
+                }
+                if ($(serverSelect).hasClass('select2-hidden-accessible')) {
+                    $(serverSelect).trigger('change');
+                }
+
+                // 当表单提交时，缓存当前选择值
+                const form = document.querySelector('#addModal form');
+                form.addEventListener('submit', function () {
+                    const selectedJob = jobSelect.value;
+                    const selectedServer = serverSelect.value;
+                    // 避免阻塞
+                    requestIdleCallback(() => {
+                        localStorage.setItem('last_job', selectedJob);
+                        localStorage.setItem('last_server', selectedServer);
+                    });
+                });
+            });
+        </script>
+    </div>
+</body>
+
+</html>
