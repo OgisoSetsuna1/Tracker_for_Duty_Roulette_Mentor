@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from pathlib import Path
 import sys
+import os
+import json
 from sqlalchemy import or_, and_
 from collections import Counter
 import re
@@ -11,6 +13,8 @@ import io
 
 from utils.read_info import read_job_info, read_dungeon_info, read_server_info
 from utils.user_settings import load_settings, save_settings
+from utils.wordcloud import generate_wordcloud_json
+
 
 # 若果是打包后的应用，使用 sys.executable 获取可执行文件路径
 # 如果是未打包的应用，使用 __file__ 获取当前脚本路径
@@ -29,6 +33,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 SETTINGS_PATH = INSTANCE_DIR / 'user_settings.json'
+WC_PATH = INSTANCE_DIR / 'wordcloud.json'
 
 # 基本数据目录
 DATA_DIR = BASE_DIR / Path('data')
@@ -66,6 +71,9 @@ def index():
 
 @app.route('/record')
 def record():
+    settings = load_settings(SETTINGS_PATH)
+    font_size = settings.get('font_size', '0.9rem')
+
     # 分页参数
     page = request.args.get('page', 1, type=int)
     per_page = int(request.args.get('per_page', 10))
@@ -194,6 +202,7 @@ def record():
     records = db.paginate(stmt, page=page, per_page=per_page, error_out=False)
 
     return render_template('record.html',
+                           font_size=font_size,
                            records=records,
                            jobs=jobs,
                            dungeons=dungeons,
@@ -519,6 +528,7 @@ def settings():
     if request.method == 'POST':
         username = request.form['username'].strip()
         target_count_raw = request.form['target_count'].strip()
+        font_size = request.form.get('font_size').strip()
 
         if not username:
             error['username'] = '用户名不能为空！'
@@ -533,20 +543,40 @@ def settings():
         if not error:
             settings_data = {
                 'username': username,
-                'target_count': target_count
+                'target_count': target_count,
+                'font_size': font_size
             }
             save_settings(SETTINGS_PATH, settings_data)
             return redirect(url_for('settings', success=1))
 
         settings_data = {
             'username': username,
-            'target_count': target_count_raw
+            'target_count': target_count_raw,
+            'font_size': font_size
         }
         return render_template('settings.html', settings=settings_data, error=error, success=False, active_page='settings')
 
     settings_data = load_settings(SETTINGS_PATH)
     return render_template('settings.html', settings=settings_data, error=None, success=success, active_page='settings')
 
+@app.route('/wordcloud', methods=['GET'])
+def wordcloud():
+    if not os.path.exists(WC_PATH):
+        # 第一次进入时未生成词云，传空数组
+        return render_template('wordcloud.html', wordcloud_data=[], active_page='wordcloud')
+    try:
+        with open(WC_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return render_template('wordcloud.html', wordcloud_data=data, active_page='wordcloud')
+    except Exception:
+        # 读取失败也传空数组
+        return render_template('wordcloud.html', wordcloud_data=[], active_page='wordcloud')
+
+@app.route('/refresh_wordcloud', methods=['GET'])
+def refresh_wordcloud():
+    records = Record.query.with_entities(Record.note).all()
+    generate_wordcloud_json(records, WC_PATH)
+    return redirect('/wordcloud')
 
 if __name__ == '__main__':
     with app.app_context():

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>用户设置</title>
+    <title>导随词云</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -37,6 +37,11 @@
             backdrop-filter: blur(5px);
             background-color: rgba(0, 0, 0, 0.4);
             z-index: -1;
+        }
+
+        #wordCloudCanvas {
+            display: block;
+            margin: 0 auto;
         }
     </style>
 </head>
@@ -73,60 +78,53 @@
         </div>
     </nav>
     <div class="px-5">
-        <h1 class="mb-4">用户设置</h1>
-        {% if success %}
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            设置已成功保存！
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <div class="mb-3">
+            <button class="btn btn-primary me-2" onclick="location.href='/refresh_wordcloud'">生成/刷新词云</button>
         </div>
-        {% endif %}
-
-        <form method="POST" action="/settings" novalidate>
-            <div class="mb-3">
-                <label for="username" class="form-label">用户名</label>
-                <input type="text" class="form-control {% if error and 'username' in error %}is-invalid{% endif %}"
-                    id="username" name="username" value="{{ settings.get('username', '') }}" required>
-                {% if error and 'username' in error %}
-                <div class="invalid-feedback">
-                    {{ error['username'] }}
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="mb-3">
-                <label for="target_count" class="form-label">期望导随次数</label>
-                <input type="number"
-                    class="form-control {% if error and 'target_count' in error %}is-invalid{% endif %}"
-                    id="target_count" name="target_count" min="1" value="{{ settings.get('target_count', '') }}"
-                    required>
-                {% if error and 'target_count' in error %}
-                <div class="invalid-feedback">
-                    {{ error['target_count'] }}
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="mb-3">
-                <label for="font_size" class="form-label">记录卡片字体大小</label>
-                <select class="form-select {% if error and 'font_size' in error %}is-invalid{% endif %}" id="font_size"
-                    name="font_size" required>
-                    <option value="0.8rem" {% if settings.get('font_size')=='0.8rem' %}selected{% endif %}>小</option>
-                    <option value="0.9rem" {% if settings.get('font_size')=='0.9rem' %}selected{% endif %}>默认</option>
-                    <option value="1.0rem" {% if settings.get('font_size')=='1.0rem' %}selected{% endif %}>大</option>
-                </select>
-                {% if error and 'font_size' in error %}
-                <div class="invalid-feedback">
-                    {{ error['font_size'] }}
-                </div>
-                {% endif %}
-            </div>
-
-            <button type="submit" class="btn btn-primary">保存设置</button>
-        </form>
-
-        <div class="d-grid gap-3 col-6 mx-auto">
+        <div id="wordCloudWrapper" class="d-flex justify-content-center align-items-center"
+            style="background-color: #f2f2f2; min-height: 60vh;">
+            <canvas id="wordCloudCanvas" style="max-width: 100%; height: auto;"></canvas>
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.1.2/src/wordcloud2.min.js"></script>
+
+    <script>
+        const wordcloudData = {{ wordcloud_data | tojson | safe }};
+        const wordList = wordcloudData.map(item => [item.text || item.name, item.value]);
+
+        const canvas = document.getElementById('wordCloudCanvas');
+        canvas.width = canvas.parentElement.offsetWidth;
+        canvas.height = canvas.width * 0.5;
+
+        if (wordList.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.font = '20px sans-serif';
+            ctx.fillStyle = '#666';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('暂无词云数据，请点击上方按钮生成词云数据！', canvas.width / 2, canvas.height / 2);
+        } else {
+            WordCloud(canvas, {
+                list: wordList,
+                gridSize: Math.round(16 * canvas.width / 1024),
+                weightFactor: 2,
+                fontFamily: 'sans-serif',
+                color: () => {
+                    const colors = ['#6C91BF', '#88B04B', '#F29C9F', '#F4A259', '#C9BBCF', '#A1C6EA', '#F5E960'];
+                    return colors[Math.floor(Math.random() * colors.length)];
+                },
+                rotateRatio: 0,
+                rotationSteps: 1,
+                gridSize: 20,
+                click: function (item) {
+                    const word = item[0];
+                    window.open(`/record?q=${encodeURIComponent(word)}`, '_self');
+                }
+            });
+        }
+    </script>
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
